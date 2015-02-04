@@ -26,12 +26,71 @@ namespace SpendingReport.DataContext
             return (column.ColumnName == DbConnection.entityIdFieldName);
         }
 
-        public TEntity GetSingle<TEntity>(params DbParameter[] parameters) where TEntity : IDbEntity, new()
+        public TProperty GetScalar<TProperty>(string procedure, params DbParameter[] parameters)
+            where TProperty : IConvertible
+        {
+            using (SqlCommand getCommand = new SqlCommand(procedure, this.dbConnection))
+            {
+                getCommand.CommandType = CommandType.StoredProcedure;
+
+                foreach (DbParameter parameter in parameters)
+                {
+                    getCommand.Parameters.AddWithValue(parameter.Name, parameter.Value);
+                }
+
+                this.dbConnection.Open();
+
+                try
+                {
+                    return (TProperty)Convert.ChangeType(getCommand.ExecuteScalar(), typeof(TProperty));
+                }
+                finally
+                {
+                    this.dbConnection.Close();
+                }
+            }
+        }
+
+        public TProperty[] GetScalarSet<TProperty>(string procedure, params DbParameter[] parameters)
+            where TProperty : IConvertible
+        {
+            using (SqlCommand getCommand = new SqlCommand(procedure, this.dbConnection))
+            {
+                getCommand.CommandType = CommandType.StoredProcedure;
+
+                foreach (DbParameter parameter in parameters)
+                {
+                    getCommand.Parameters.AddWithValue(parameter.Name, parameter.Value);
+                }
+
+                using (DataTable scalarTable = new DataTable())
+                {
+                    using (SqlDataAdapter getAdapter = new SqlDataAdapter(getCommand))
+                    {
+                        getAdapter.Fill(scalarTable);
+                    }
+
+                    Type conversionType = typeof(TProperty);
+                    TProperty[] scalars = new TProperty[scalarTable.Rows.Count];
+
+                    for (int i = 0; i < scalars.Length; ++i)
+                    {
+                        scalars[i] = (TProperty)Convert.ChangeType(scalarTable.Rows[i][0], conversionType);
+                    }
+
+                    return scalars;
+                }
+            }
+        }
+
+        public TEntity GetSingle<TEntity>(params DbParameter[] parameters)
+            where TEntity : IDbEntity, new()
         {
             return this.Get<TEntity>(parameters).FirstOrDefault();
         }
 
-        public TEntity[] Get<TEntity>(params DbParameter[] parameters) where TEntity : IDbEntity, new()
+        public TEntity[] Get<TEntity>(params DbParameter[] parameters)
+            where TEntity : IDbEntity, new()
         {
             const DbOperation operation = DbOperation.Get;
             Type entityType = typeof(TEntity);
@@ -48,6 +107,8 @@ namespace SpendingReport.DataContext
             {
                 using (SqlCommand getCommand = new SqlCommand(operationInfo.Procedure, this.dbConnection))
                 {
+                    getCommand.CommandType = CommandType.StoredProcedure;
+
                     foreach (DbParameter parameter in parameters)
                     {
                         getCommand.Parameters.AddWithValue(parameter.Name, parameter.Value);
@@ -72,12 +133,14 @@ namespace SpendingReport.DataContext
             }
         }
 
-        public void Put<TEntity>(TEntity entity) where TEntity : IDbEntity, new()
+        public void Put<TEntity>(TEntity entity)
+            where TEntity : IDbEntity, new()
         {
             this.Put<TEntity>(new TEntity[] { entity });
         }
 
-        public void Put<TEntity>(TEntity[] entities) where TEntity : IDbEntity, new()
+        public void Put<TEntity>(TEntity[] entities)
+            where TEntity : IDbEntity, new()
         {
             const DbOperation operation = DbOperation.Put;
             Type entityType = typeof(TEntity);
@@ -112,6 +175,7 @@ namespace SpendingReport.DataContext
                         };
 
                         putCommand.Parameters.Add(entityParameter);
+                        putCommand.CommandType = CommandType.StoredProcedure;
 
                         using (SqlDataAdapter putAdapter = new SqlDataAdapter(putCommand))
                         {
@@ -128,12 +192,14 @@ namespace SpendingReport.DataContext
             }
         }
 
-        public void Delete<TEntity>(TEntity entity) where TEntity : IDbEntity, new()
+        public void Delete<TEntity>(TEntity entity)
+            where TEntity : IDbEntity, new()
         {
             this.Delete<TEntity>(new TEntity[] { entity });
         }
 
-        public void Delete<TEntity>(TEntity[] entities) where TEntity : IDbEntity, new()
+        public void Delete<TEntity>(TEntity[] entities)
+            where TEntity : IDbEntity, new()
         {
             const DbOperation operation = DbOperation.Delete;
 
@@ -156,7 +222,7 @@ namespace SpendingReport.DataContext
                     entityTable.Rows.Add(entityRow);
                 }
 
-                using (SqlCommand putCommand = new SqlCommand(operationInfo.Procedure, this.dbConnection))
+                using (SqlCommand deleteCommand = new SqlCommand(operationInfo.Procedure, this.dbConnection))
                 {
                     SqlParameter entityParameter = new SqlParameter()
                     {
@@ -165,14 +231,16 @@ namespace SpendingReport.DataContext
                         Value = entityTable
                     };
 
-                    putCommand.Parameters.Add(entityParameter);
+                    deleteCommand.Parameters.Add(entityParameter);
+                    deleteCommand.CommandType = CommandType.StoredProcedure;
 
-                    putCommand.ExecuteNonQuery();
+                    deleteCommand.ExecuteNonQuery();
                 }
             }
         }
 
-        private DbTypeInfo GetDbTypeInfo<TEntity>() where TEntity : IDbEntity, new()
+        private DbTypeInfo GetDbTypeInfo<TEntity>()
+            where TEntity : IDbEntity, new()
         {
             Type entityType = typeof(TEntity);
             DbTypeInfo entityDbTypeInfo;
@@ -244,6 +312,8 @@ namespace SpendingReport.DataContext
     public interface IDbConnection : IDisposable
     {
         bool IsReservedColumn(DataColumn column);
+        TProperty GetScalar<TProperty>(string procedure, DbParameter[] parameters) where TProperty : IConvertible;
+        TProperty[] GetScalarSet<TProperty>(string procedure, DbParameter[] parameters) where TProperty : IConvertible;
         TEntity GetSingle<TEntity>(DbParameter[] parameters) where TEntity : IDbEntity, new();
         TEntity[] Get<TEntity>(DbParameter[] parameters) where TEntity : IDbEntity, new();
         void Put<TEntity>(TEntity entity) where TEntity : IDbEntity, new();

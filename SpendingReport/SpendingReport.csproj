@@ -153,6 +153,7 @@
     <Compile Include="Controllers\UserController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="DataContext\DbConnection.cs" />
+    <Compile Include="DataContext\DbConnectionFactory.cs" />
     <Compile Include="DataContext\DbEntity.cs" />
     <Compile Include="DataContext\DbParameter.cs" />
     <Compile Include="Global.asax.cs">

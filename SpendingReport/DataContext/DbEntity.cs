@@ -57,12 +57,14 @@ namespace SpendingReport.DataContext
         }
 
         protected TProperty DelayLoadScalar<TProperty>(string cacheKey, string getProcedure, params DbParameter[] parameters)
+            where TProperty : IConvertible
         {
             TProperty scalar;
 
             if (!this.TryGetDelayLoadedValue<TProperty>(cacheKey, out scalar))
             {
-
+                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
+                scalar = dbConnection.GetScalar<TProperty>(getProcedure, parameters);
                 this.CacheDelayLoadedValue(cacheKey, scalar);
             }
 
@@ -70,12 +72,14 @@ namespace SpendingReport.DataContext
         }
 
         protected TProperty[] DelayLoadScalarSet<TProperty>(string cacheKey, string getProcedure, params DbParameter[] parameters)
+            where TProperty : IConvertible
         {
             TProperty[] scalars;
 
             if (!this.TryGetDelayLoadedValue<TProperty[]>(cacheKey, out scalars))
             {
-
+                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
+                scalars = dbConnection.GetScalarSet<TProperty>(getProcedure, parameters);
                 this.CacheDelayLoadedValue(cacheKey, scalars);
             }
 
@@ -89,7 +93,8 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty>(cacheKey, out entity))
             {
-                
+                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
+                entity = dbConnection.GetSingle<TProperty>(parameters);
                 this.CacheDelayLoadedValue(cacheKey, entity);
             }
 
@@ -103,7 +108,8 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty[]>(cacheKey, out entities))
             {
-
+                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
+                entities = dbConnection.Get<TProperty>(parameters);
                 this.CacheDelayLoadedValue(cacheKey, entities);
             }
 
