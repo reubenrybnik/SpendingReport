@@ -52,8 +52,8 @@ CREATE TABLE UserCategories
 	CategoryId bigint not null
 		constraint FK_UserCategories_Categories foreign key references Categories(CategoryId),
 
-	-- unfortunately, recursive cascades aren't allowed, so I can't have this column auto-null
-	-- itself when parent categories are deleted
+	-- Unfortunately, recursive cascades aren't allowed, so I can't have this column auto-null
+	-- itself when parent categories are deleted.
 	ParentUserCategoryId bigint null
 		constraint FK_UserCategories_UserCategories foreign key references UserCategories(UserCategoryId)
 		constraint DF_UserCategories_ParentUserCategoryId default(null),
@@ -72,7 +72,7 @@ CREATE TABLE Payees
 		constraint UQ_Payees_Name unique
 )
 
--- TODO: consider partitioning this table by TransactionDate
+-- TODO: Consider partitioning this table by TransactionDate
 CREATE TABLE Transactions
 (
 	TransactionId uniqueidentifier not null
@@ -85,8 +85,11 @@ CREATE TABLE Transactions
 	PayeeId bigint not null
 		constraint FK_Transactions_Payees foreign key references Payees(PayeeId),
 
+	-- TODO: SQL is unhappy about "on delete set default" for this foreign key; something to do with
+	-- the delete cascade on users causing two actions to occur if a user is deleted. Consider how best to
+	-- deal with that.
 	UserCategoryId bigint null
-		constraint FK_Transactions_Categories foreign key references UserCategories(UserCategoryId) on delete set default
+		constraint FK_Transactions_Categories foreign key references UserCategories(UserCategoryId)
 		constraint DF_Transactions_UserCategoryId default(null),
 
 	Amount money not null,
@@ -140,14 +143,14 @@ BEGIN
 END
 GO
 
--- since categories can have children, make sure no recursion occurs
+-- Since categories can have children, make sure no recursion occurs.
 ALTER TABLE UserCategories
 ADD CONSTRAINT CK_UserCategories_NoRecursion CHECK (dbo.FN_UserCategories_HasRecursion(UserCategoryId, ParentUserCategoryId) IS NULL)
 GO
 
 -- I was originally planning on making these views updateable, but that didn't work with
 -- the output clauses in the put stored procedures, so for now these are only used for easy viewing
--- of joined tables and get operations
+-- of joined tables and get operations.
 CREATE VIEW VW_UserCategories
 WITH SCHEMABINDING, VIEW_METADATA
 AS
@@ -171,6 +174,13 @@ INNER JOIN dbo.Payees ON Transactions.PayeeId = Payees.PayeeId
 LEFT JOIN dbo.VW_UserCategories AS Categories ON Transactions.UserCategoryId = Categories.UserCategoryId
 GO
 
+-- TODO: Consider using read uncommitted transaction isolation on get procedures that involve UserIds (currently all
+-- of them) to improve performance since it is unlikely that a single user will be introducing concurrency problems
+-- by performing operations in two different places at the same time.
+
+-- TODO: Not really liking the rigidity of the execution plans for these get queries, consider if/elsing
+-- instead of having a single query even though it will be messy.
+
 CREATE PROCEDURE SP_Users_Get
 (
 	@UserId bigint = null,
@@ -179,30 +189,62 @@ CREATE PROCEDURE SP_Users_Get
 )
 AS
 BEGIN
-	DECLARE @Users UDT_Users_Get;
-
-	INSERT INTO @Users (UserId, UserName, Salt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress)
 	SELECT UserId, UserName, Salt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress
 	FROM Users
 	WHERE (@UserId IS NULL OR UserId = @UserId)
 		AND (@UserName IS NULL OR UserName = @UserName)
 		AND (@EmailAddress IS NULL OR EmailAddress = @EmailAddress)
+	OPTION
+	(
+		OPTIMIZE FOR
+		(
+			@UserId = NULL,
+			@UserName UNKNOWN,
+			@EmailAddress = NULL
+		)
+	)
 END
 GO
 
+-- TODO: I just found out that user-defined table types can have constraints
+-- (though they can't be nicely named, grr...). Merges work best when joined using source
+-- table fields that are pre-sorted; determine whether or not having the indexes that
+-- these constraints implicitly cause to be created help or hinder performance and consider
+-- reworking the client code to support PK constraints on the Id fields to improve merge
+-- performance. Note that a sort still happens if any joins are used since duplicate rows
+-- could occur, so this likely won't work if I abstract away the Categories and Payees tables
+-- like I am currently doing.
+
 CREATE TYPE UDT_Users_Put AS TABLE
 (
-	EntityId int not null,
+	EntityId int not null
+		primary key,
+
 	UserId bigint not null,
-	UserName nvarchar(64) not null,
+
+	UserName nvarchar(64) not null
+		unique,
+
 	Salt int not null,
+
 	PasswordHash nvarchar(max) not null,
+
 	FirstName nvarchar(64) not null,
+
 	MiddleInitial char(1) null,
+
 	LastName nvarchar(64) not null,
+
 	EmailAddress nvarchar(64) not null
+		unique
 )
 GO
+
+-- TODO: Regarding upserts using merge, http://weblogs.sqlteam.com/dang/archive/2009/01/31/UPSERT-Race-Condition-With-MERGE.aspx
+-- claims that WITH (HOLDLOCK) is necessary to avoid possible race conditions when concurrent connections
+-- are running the same merge, and so far in addition to several other articles referring to this article I've found
+-- nothing to refute its claims or show that the underlying problem has been fixed somehow. Consider adding this
+-- to all merge upserts since I'm not currently using any explicit transactions.
 
 CREATE PROCEDURE SP_Users_Put
 (
@@ -230,6 +272,7 @@ GO
 CREATE TYPE UDT_Users_Del AS TABLE
 (
 	UserId bigint not null
+		primary key
 )
 GO
 
@@ -265,10 +308,16 @@ GO
 
 CREATE TYPE UDT_UserCategories_Put AS TABLE
 (
-	EntityId int not null,
+	EntityId int not null
+		primary key,
+
 	UserCategoryId bigint not null,
+
 	UserId bigint not null,
-	Name nvarchar(32) not null,
+
+	Name nvarchar(32) not null
+		unique,
+
 	ParentName nvarchar(32) null
 )
 GO
@@ -326,6 +375,7 @@ GO
 CREATE TYPE UDT_UserCategories_Del AS TABLE
 (
 	UserCategoryId bigint not null
+		primary key
 )
 GO
 
@@ -335,27 +385,36 @@ CREATE PROCEDURE SP_UserCategories_Del
 )
 AS
 BEGIN
-	-- since recursive cascades aren't allowed, manually find all children and update their parent
-	-- ids to null
-	-- happily, sql seems to be ok with doing this as long as the foreign key constraints are all
-	-- satisfied at the end of the merge
+	-- For good query plans, https://technet.microsoft.com/en-us/library/cc879317.aspx recommends
+	-- parameterizing all constants in MERGE's ON and WHEN clauses. Also, declaring these as bits
+	-- explicitly instead of letting them implicitly be ints will likely improve cardinality estimates
+	-- since it greatly increases the probability of the comparisons being true.
+	DECLARE @DeleteRequired bit;
+	SET @DeleteRequired = 1;
+
+	DEClARE @DeleteNotRequired bit
+	SET @DeleteNotRequired = 0;
+
+	-- Since recursive cascades aren't allowed, manually find all children and update their parent
+	-- ids to null. Happily, sql will be ok with doing this as long as the foreign key
+	-- constraints are all satisfied at the end of the merge's autocommit transaction.
 	WITH ResolvedDeleted AS
 	(
-		SELECT 1 AS DeleteRequired, DelUserCategories.UserCategoryId
+		SELECT @DeleteRequired AS DeleteRequired, DelUserCategories.UserCategoryId
 		FROM @UserCategories AS DelUserCategories
 		UNION ALL
-		SELECT 0 AS DeleteRequired, ChildUserCategories.UserCategoryId
+		SELECT @DeleteNotRequired AS DeleteRequired, ChildUserCategories.UserCategoryId
 		FROM ResolvedDeleted
 		INNER JOIN UserCategories AS ChildUserCategories ON ResolvedDeleted.UserCategoryId = ChildUserCategories.ParentUserCategoryId
-		WHERE ResolvedDeleted.DeleteRequired = 1
+		WHERE ResolvedDeleted.DeleteRequired = @DeleteRequired
 	)
 	MERGE INTO UserCategories AS target
 	USING ResolvedDeleted AS source
 	ON target.UserCategoryId = source.UserCategoryId
-	WHEN MATCHED AND source.DeleteRequired = 0 THEN
+	WHEN MATCHED AND source.DeleteRequired = @DeleteNotRequired THEN
 		UPDATE
 		SET ParentUserCategoryId = NULL
-	WHEN MATCHED AND source.DeleteRequired = 1 THEN
+	WHEN MATCHED AND source.DeleteRequired = @DeleteRequired THEN
 		DELETE;
 END
 GO
@@ -378,7 +437,7 @@ BEGIN
 		AND (@CategoryName IS NULL OR CategoryName = @CategoryName)
 		AND (@PayeeName IS NULL OR PayeeName = @PayeeName)
 		AND (@StartDate IS NULL OR TransactionDate >= @StartDate)
-		AND (@EndDate IS NULL OR TransactionDate <= @StartDate)
+		AND (@EndDate IS NULL OR TransactionDate <= @EndDate)
 	OPTION
 	(
 		OPTIMIZE FOR
@@ -396,12 +455,19 @@ GO
 
 CREATE TYPE UDT_Transactions_Put AS TABLE
 (
-	EntityId int not null,
+	EntityId int not null
+		primary key,
+
 	TransactionId uniqueidentifier not null,
+
 	UserId bigint not null,
+
 	CategoryName nvarchar(32) not null,
+
 	PayeeName nvarchar(128) not null,
+
 	Amount money not null,
+
 	TransactionDate date not null
 )
 GO
@@ -450,6 +516,7 @@ GO
 CREATE TYPE UDT_Transactions_Del AS TABLE
 (
 	TransactionId uniqueidentifier not null
+		primary key
 )
 GO
 
