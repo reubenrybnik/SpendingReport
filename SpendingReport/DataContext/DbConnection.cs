@@ -11,7 +11,7 @@ namespace SpendingReport.DataContext
     public sealed class DbConnection : IDbConnection
     {
         private const string entityIdFieldName = "EntityId";
-        private const string getSchemaCommandFormat = "DECLARE @schemaTable {0}; SELECT * FROM @schemaTable;";
+        private const string getSchemaCommandFormat = "DECLARE @schemaTable [{0}]; SELECT * FROM @schemaTable;";
         private static readonly Dictionary<Type, DbTypeInfo> dbTypeInfo = new Dictionary<Type, DbTypeInfo>();
 
         private readonly SqlConnection dbConnection = new SqlConnection(Properties.Settings.Default.DbConnectionString);

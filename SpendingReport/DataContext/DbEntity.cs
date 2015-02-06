@@ -40,7 +40,8 @@ namespace SpendingReport.DataContext
             {
                 if (!connection.IsReservedColumn(column))
                 {
-                    DbEntity<TEntity>.properties[column.ColumnName].SetValue(this, row[column]);
+                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName];
+                    propertyInfo.SetValue(this, Convert.ChangeType(row[column], propertyInfo.PropertyType));
                 }
             }
         }
@@ -51,7 +52,8 @@ namespace SpendingReport.DataContext
             {
                 if (!connection.IsReservedColumn(column))
                 {
-                    row[column] = DbEntity<TEntity>.properties[column.ColumnName].GetValue(this);
+                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName];
+                    row[column] = Convert.ChangeType(propertyInfo.GetValue(this), column.DataType);
                 }
             }
         }
@@ -159,6 +161,10 @@ namespace SpendingReport.DataContext
         Delete
     }
 
+    // TODO: I'd prefer this interface to be internal, but doing that and having the DbOperations property
+    // be abstract causes compiler issues. For now, I'm ok with this since this is all just one project that
+    // won't be inherited from anyway, but ideally I'd put the data context in its own project since it's generic
+    // enough to work with any project that interacts with SQL.
     public interface IDbEntity
     {
         IReadOnlyDictionary<DbOperation, DbOperationInfo> DbOperations { get; }

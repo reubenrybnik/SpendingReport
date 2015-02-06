@@ -107,9 +107,11 @@ CREATE TABLE Transactions
 	-- than on TransactionId, so I'm making that the clustered index to help make such
 	-- queries faster
 	index IX_Transactions_UserId_TransactionDate clustered (UserId, TransactionDate),
-	index IX_Transactions_UserId_PayeeId (UserId, PayeeId),
-	index IX_Transactions_UserCategoryId (UserCategoryId)
+	index IX_Transactions_UserId_PayeeId (UserId, PayeeId)
 )
+
+-- unfortunately, include columns can't be specified in create table statements
+CREATE INDEX IX_Transactions_UserCategoryId ON Transactions(UserCategoryId) INCLUDE (Amount)
 GO
 
 CREATE FUNCTION FN_UserCategories_HasRecursion
@@ -159,10 +161,27 @@ WITH ResolvedUserCategories AS
 	SELECT UserCategories.UserCategoryId, UserCategories.UserId, Categories.Name, UserCategories.ParentUserCategoryId
 	FROM dbo.UserCategories
 	INNER JOIN dbo.Categories ON UserCategories.CategoryId = Categories.CategoryId
+),
+RecursiveUserCategories AS
+(
+	SELECT UserCategories.UserCategoryId AS AncestorUserCategoryId, UserCategories.UserCategoryId
+	FROM dbo.UserCategories
+	UNION ALL
+	SELECT ParentCategories.AncestorUserCategoryId, ChildCategories.UserCategoryId
+	FROM RecursiveUserCategories AS ParentCategories
+	INNER JOIN dbo.UserCategories AS ChildCategories ON ParentCategories.UserCategoryId = ChildCategories.ParentUserCategoryId
+),
+UserCategorySpending AS
+(
+	SELECT RecursiveUserCategories.AncestorUserCategoryId AS UserCategoryId, SUM(CASE WHEN RecursiveUserCategories.AncestorUserCategoryId = RecursiveUserCategories.UserCategoryId THEN Transactions.Amount ELSE 0 END) AS Spending, SUM(Transactions.Amount) AS RecursiveSpending
+	FROM RecursiveUserCategories
+	INNER JOIN Transactions ON RecursiveUserCategories.UserCategoryId = Transactions.UserCategoryId
+	GROUP BY RecursiveUserCategories.AncestorUserCategoryId
 )
-SELECT UserCategories.UserCategoryId, UserCategories.UserId, UserCategories.Name, UserCategories.ParentUserCategoryId, ParentCategories.Name AS ParentName
+SELECT UserCategories.UserCategoryId, UserCategories.UserId, UserCategories.Name, UserCategories.ParentUserCategoryId, ParentCategories.Name AS ParentName, ISNULL(UserCategorySpending.Spending, 0) AS Spending, ISNULL(UserCategorySpending.RecursiveSpending, 0) AS RecursiveSpending
 FROM ResolvedUserCategories AS UserCategories
 LEFT JOIN ResolvedUserCategories AS ParentCategories ON UserCategories.ParentUserCategoryId = ParentCategories.UserCategoryId
+LEFT JOIN UserCategorySpending ON UserCategories.UserCategoryId = UserCategorySpending.UserCategoryId
 GO
 
 CREATE VIEW VW_Transactions
@@ -416,6 +435,26 @@ BEGIN
 		SET ParentUserCategoryId = NULL
 	WHEN MATCHED AND source.DeleteRequired = @DeleteRequired THEN
 		DELETE;
+END
+GO
+
+-- TODO: Enforce a category depth limit of no more than 16 in a check constraint, and consider
+-- limiting depth to a more reasonable number like 5 to keep recursive queries reasonably
+-- quick.
+-- TODO: Figure out the best way to assign hierarchy levels to categories.
+CREATE PROCEDURE SP_UserCategorySpendings_Get
+(
+	@UserId bigint,
+	@ParentName nvarchar(32) = null,
+	@Level tinyint = null
+)
+AS
+BEGIN
+	SELECT UserCategoryId, Name, Spending, RecursiveSpending
+	FROM VW_UserCategories
+	WHERE UserId = @UserId
+		AND (@ParentName IS NULL OR ParentName = @ParentName)
+		--AND (@Level IS NULL OR [Level] = @Level
 END
 GO
 
