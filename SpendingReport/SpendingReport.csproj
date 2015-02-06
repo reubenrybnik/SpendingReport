@@ -156,6 +156,7 @@
     <Compile Include="DataContext\DbConnectionFactory.cs" />
     <Compile Include="DataContext\DbEntity.cs" />
     <Compile Include="DataContext\DbParameter.cs" />
+    <Compile Include="DataContext\UserCategorySpending.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>

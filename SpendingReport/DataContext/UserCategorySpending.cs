@@ -22,6 +22,11 @@ namespace SpendingReport.DataContext
             }
         );
 
+        public override IReadOnlyDictionary<DbOperation, DbOperationInfo> DbOperations
+        {
+            get { return UserCategorySpending.entityDbOperations; }
+        }
+
         public long UserCategoryId
         {
             get;
