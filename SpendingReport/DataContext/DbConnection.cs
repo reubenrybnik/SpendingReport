@@ -312,10 +312,10 @@ namespace SpendingReport.DataContext
     public interface IDbConnection : IDisposable
     {
         bool IsReservedColumn(DataColumn column);
-        TProperty GetScalar<TProperty>(string procedure, DbParameter[] parameters) where TProperty : IConvertible;
-        TProperty[] GetScalarSet<TProperty>(string procedure, DbParameter[] parameters) where TProperty : IConvertible;
-        TEntity GetSingle<TEntity>(DbParameter[] parameters) where TEntity : IDbEntity, new();
-        TEntity[] Get<TEntity>(DbParameter[] parameters) where TEntity : IDbEntity, new();
+        TProperty GetScalar<TProperty>(string procedure, params DbParameter[] parameters) where TProperty : IConvertible;
+        TProperty[] GetScalarSet<TProperty>(string procedure, params DbParameter[] parameters) where TProperty : IConvertible;
+        TEntity GetSingle<TEntity>(params DbParameter[] parameters) where TEntity : IDbEntity, new();
+        TEntity[] Get<TEntity>(params DbParameter[] parameters) where TEntity : IDbEntity, new();
         void Put<TEntity>(TEntity entity) where TEntity : IDbEntity, new();
         void Put<TEntity>(TEntity[] entities) where TEntity : IDbEntity, new();
         void Delete<TEntity>(TEntity entity) where TEntity : IDbEntity, new();

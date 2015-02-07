@@ -4,14 +4,15 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Web;
 
 namespace SpendingReport.Models
 {
-    [Serializable]
+    [DataContract]
     public sealed class User : DbEntity<User>, IUser
     {
-        private static readonly Random saltGenerator = new Random();
+        private static readonly Random passwordSaltGenerator = new Random();
         private static readonly IReadOnlyDictionary<DbOperation, DbOperationInfo> entityDbOperations = new ReadOnlyDictionary<DbOperation, DbOperationInfo>
         (
             new Dictionary<DbOperation, DbOperationInfo>()
@@ -44,7 +45,7 @@ namespace SpendingReport.Models
             }
         );
 
-        private int salt;
+        private int passwordSalt;
 
         public override IReadOnlyDictionary<DbOperation, DbOperationInfo> DbOperations
         {
@@ -62,27 +63,28 @@ namespace SpendingReport.Models
             private set;
         }
 
+        [DataMember]
         public string UserName
         {
             get;
             set;
         }
 
-        public int Salt
+        public int PasswordSalt
         {
             get
             {
-                if (this.salt == 0)
+                if (this.passwordSalt == 0)
                 {
-                    this.salt = User.saltGenerator.Next(1, int.MaxValue);
+                    this.passwordSalt = User.passwordSaltGenerator.Next(1, int.MaxValue);
                 }
 
-                return this.salt;
+                return this.passwordSalt;
             }
 
             private set
             {
-                this.salt = value;
+                this.passwordSalt = value;
             }
         }
 
@@ -92,24 +94,28 @@ namespace SpendingReport.Models
             set;
         }
 
+        [DataMember]
         public string FirstName
         {
             get;
             set;
         }
 
+        [DataMember]
         public char MiddleInitial
         {
             get;
             set;
         }
 
+        [DataMember]
         public string LastName
         {
             get;
             set;
         }
 
+        [DataMember]
         public string EmailAddress
         {
             get;

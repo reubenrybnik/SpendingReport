@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Web;
 
 namespace SpendingReport.Models
 {
-    [Serializable]
+    [DataContract]
     public sealed class Transaction : DbEntity<Transaction>
     {
         private static readonly IReadOnlyDictionary<DbOperation, DbOperationInfo> entityDbOperations = new ReadOnlyDictionary<DbOperation, DbOperationInfo>
@@ -18,7 +19,7 @@ namespace SpendingReport.Models
                     DbOperation.Get,
                     new DbOperationInfo()
                     {
-                        Procedure = "SP_Users_Get"
+                        Procedure = "SP_Transactions_Get"
                     }
                 },
                 {
@@ -59,36 +60,42 @@ namespace SpendingReport.Models
             set;
         }
 
+        [DataMember]
         public string CategoryName
         {
             get;
             set;
         }
 
+        [DataMember]
         public string PayeeName
         {
             get;
             set;
         }
 
+        [DataMember]
         public double Amount
         {
             get;
             set;
         }
 
+        [DataMember]
         public DateTime TransactionDate
         {
             get;
             set;
         }
 
+        [DataMember]
         public DateTime AddedDate
         {
             get;
             private set;
         }
 
+        [DataMember]
         public DateTime ModifiedDate
         {
             get;

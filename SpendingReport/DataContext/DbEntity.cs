@@ -4,6 +4,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Web;
 
 namespace SpendingReport.DataContext
@@ -12,22 +13,32 @@ namespace SpendingReport.DataContext
     public abstract class DbEntity<TEntity> : IDbEntity
         where TEntity : DbEntity<TEntity>, new()
     {
-        private static readonly Dictionary<string, PropertyInfo> properties = typeof(TEntity).GetProperties().Where(property => property.CanWrite).ToDictionary(property => property.Name);
+        private static readonly Dictionary<string, DbEntityProperty> properties = typeof(TEntity).GetProperties().Where(property => property.CanWrite).ToDictionary(property => property.Name, property => new DbEntityProperty(property));
 
         private readonly Dictionary<string, object> delayLoadedValues = new Dictionary<string, object>();
 
         public abstract IReadOnlyDictionary<DbOperation, DbOperationInfo> DbOperations { get; }
 
+        public void Put(TEntity other)
+        {
+            foreach (DbEntityProperty property in DbEntity<TEntity>.properties.Values)
+            {
+                if (property.IsDataMember)
+                {
+                    property.PropertyInfo.SetValue(this, property.PropertyInfo.GetValue(other));
+                }
+            }
+        }
+
         protected TEntity CloneInternal()
         {
             TEntity clonedEntity = new TEntity();
 
-            foreach (PropertyInfo property in DbEntity<TEntity>.properties.Values)
+            foreach (DbEntityProperty property in DbEntity<TEntity>.properties.Values)
             {
-                // if write accessor is public
-                if (property.GetAccessors().Length > 1)
+                if (property.HasPublicSet)
                 {
-                    property.SetValue(clonedEntity, property.GetValue(this));
+                    property.PropertyInfo.SetValue(clonedEntity, property.PropertyInfo.GetValue(this));
                 }
             }
 
@@ -40,7 +51,7 @@ namespace SpendingReport.DataContext
             {
                 if (!connection.IsReservedColumn(column))
                 {
-                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName];
+                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName].PropertyInfo;
                     propertyInfo.SetValue(this, Convert.ChangeType(row[column], propertyInfo.PropertyType));
                 }
             }
@@ -52,7 +63,7 @@ namespace SpendingReport.DataContext
             {
                 if (!connection.IsReservedColumn(column))
                 {
-                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName];
+                    PropertyInfo propertyInfo = DbEntity<TEntity>.properties[column.ColumnName].PropertyInfo;
                     row[column] = Convert.ChangeType(propertyInfo.GetValue(this), column.DataType);
                 }
             }
@@ -65,9 +76,11 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty>(cacheKey, out scalar))
             {
-                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
-                scalar = dbConnection.GetScalar<TProperty>(getProcedure, parameters);
-                this.CacheDelayLoadedValue(cacheKey, scalar);
+                using (IDbConnection dbConnection = DbConnectionFactory.CreateConnection())
+                {
+                    scalar = dbConnection.GetScalar<TProperty>(getProcedure, parameters);
+                    this.CacheDelayLoadedValue(cacheKey, scalar);
+                }
             }
 
             return scalar;
@@ -80,9 +93,11 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty[]>(cacheKey, out scalars))
             {
-                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
-                scalars = dbConnection.GetScalarSet<TProperty>(getProcedure, parameters);
-                this.CacheDelayLoadedValue(cacheKey, scalars);
+                using (IDbConnection dbConnection = DbConnectionFactory.CreateConnection())
+                {
+                    scalars = dbConnection.GetScalarSet<TProperty>(getProcedure, parameters);
+                    this.CacheDelayLoadedValue(cacheKey, scalars);
+                }
             }
 
             return scalars;
@@ -95,9 +110,11 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty>(cacheKey, out entity))
             {
-                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
-                entity = dbConnection.GetSingle<TProperty>(parameters);
-                this.CacheDelayLoadedValue(cacheKey, entity);
+                using (IDbConnection dbConnection = DbConnectionFactory.CreateConnection())
+                {
+                    entity = dbConnection.GetSingle<TProperty>(parameters);
+                    this.CacheDelayLoadedValue(cacheKey, entity);
+                }
             }
 
             return entity;
@@ -110,9 +127,11 @@ namespace SpendingReport.DataContext
 
             if (!this.TryGetDelayLoadedValue<TProperty[]>(cacheKey, out entities))
             {
-                IDbConnection dbConnection = DbConnectionFactory.CreateConnection();
-                entities = dbConnection.Get<TProperty>(parameters);
-                this.CacheDelayLoadedValue(cacheKey, entities);
+                using (IDbConnection dbConnection = DbConnectionFactory.CreateConnection())
+                {
+                    entities = dbConnection.Get<TProperty>(parameters);
+                    this.CacheDelayLoadedValue(cacheKey, entities);
+                }
             }
 
             return entities;
@@ -143,6 +162,34 @@ namespace SpendingReport.DataContext
                 {
                     this.delayLoadedValues.Add(propertyName, delayLoadedValue);
                 }
+            }
+        }
+
+        private class DbEntityProperty
+        {
+            public PropertyInfo PropertyInfo
+            {
+                get;
+                private set;
+            }
+
+            public bool HasPublicSet
+            {
+                get;
+                private set;
+            }
+
+            public bool IsDataMember
+            {
+                get;
+                private set;
+            }
+
+            public DbEntityProperty(PropertyInfo propertyInfo)
+            {
+                this.PropertyInfo = propertyInfo;
+                this.HasPublicSet = (propertyInfo.GetAccessors().Length > 1);
+                this.IsDataMember = propertyInfo.CustomAttributes.OfType<DataMemberAttribute>().Any();
             }
         }
     }

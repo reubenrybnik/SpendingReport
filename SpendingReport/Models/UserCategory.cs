@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Web;
 
 namespace SpendingReport.Models
 {
-    [Serializable]
+    [DataContract]
     public sealed class UserCategory : DbEntity<UserCategory>
     {
         private static readonly IReadOnlyDictionary<DbOperation, DbOperationInfo> entityDbOperations = new ReadOnlyDictionary<DbOperation, DbOperationInfo>
@@ -59,40 +60,18 @@ namespace SpendingReport.Models
             private set;
         }
 
+        [DataMember]
         public string Name
         {
             get;
             set;
         }
 
+        [DataMember]
         public string ParentName
         {
             get;
             set;
-        }
-
-        public UserCategory[] ChildCategories
-        {
-            get
-            {
-                return this.DelayLoadEntitySet<UserCategory>
-                (
-                    "ChildCategories",
-                    new DbParameter("ParentUserCategoryId", this.UserCategoryId)
-                );
-            }
-        }
-
-        // arguably something like this should be in the controller, but I like it better here for now
-        public Transaction[] GetAssociatedTransactions(DateTime startDate, DateTime endDate)
-        {
-            return this.DelayLoadEntitySet<Transaction>
-            (
-                null,
-                new DbParameter("UserCategoryId", this.UserCategoryId),
-                new DbParameter("StartDate", startDate),
-                new DbParameter("EndDate", endDate)
-            );
         }
     }
 }

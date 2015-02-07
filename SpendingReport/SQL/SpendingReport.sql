@@ -16,7 +16,7 @@ CREATE TABLE Users
 	UserName nvarchar(64) not null
 		constraint UQ_Users_UserName unique,
 
-	Salt int not null,
+	PasswordSalt int not null,
 
 	PasswordHash nvarchar(max) not null,
 
@@ -175,7 +175,7 @@ UserCategorySpending AS
 (
 	SELECT RecursiveUserCategories.AncestorUserCategoryId AS UserCategoryId, SUM(CASE WHEN RecursiveUserCategories.AncestorUserCategoryId = RecursiveUserCategories.UserCategoryId THEN Transactions.Amount ELSE 0 END) AS Spending, SUM(Transactions.Amount) AS RecursiveSpending
 	FROM RecursiveUserCategories
-	INNER JOIN Transactions ON RecursiveUserCategories.UserCategoryId = Transactions.UserCategoryId
+	INNER JOIN dbo.Transactions ON RecursiveUserCategories.UserCategoryId = Transactions.UserCategoryId
 	GROUP BY RecursiveUserCategories.AncestorUserCategoryId
 )
 SELECT UserCategories.UserCategoryId, UserCategories.UserId, UserCategories.Name, UserCategories.ParentUserCategoryId, ParentCategories.Name AS ParentName, ISNULL(UserCategorySpending.Spending, 0) AS Spending, ISNULL(UserCategorySpending.RecursiveSpending, 0) AS RecursiveSpending
@@ -208,7 +208,7 @@ CREATE PROCEDURE SP_Users_Get
 )
 AS
 BEGIN
-	SELECT UserId, UserName, Salt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress
+	SELECT UserId, UserName, PasswordSalt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress
 	FROM Users
 	WHERE (@UserId IS NULL OR UserId = @UserId)
 		AND (@UserName IS NULL OR UserName = @UserName)
@@ -244,7 +244,7 @@ CREATE TYPE UDT_Users_Put AS TABLE
 	UserName nvarchar(64) not null
 		unique,
 
-	Salt int not null,
+	PasswordSalt int not null,
 
 	PasswordHash nvarchar(max) not null,
 
@@ -275,8 +275,8 @@ BEGIN
 	USING @Users AS source
 	ON target.UserId = source.UserId
 	WHEN NOT MATCHED THEN
-		INSERT (UserName, Salt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress)
-		VALUES (UserName, Salt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress)
+		INSERT (UserName, PasswordSalt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress)
+		VALUES (UserName, PasswordSalt, PasswordHash, FirstName, MiddleInitial, LastName, EmailAddress)
 	WHEN MATCHED THEN
 		UPDATE
 		SET target.PasswordHash = source.PasswordHash,
@@ -469,7 +469,7 @@ CREATE PROCEDURE SP_Transactions_Get
 )
 AS
 BEGIN
-	SELECT TransactionId, UserId, CategoryName, PayeeName, TransactionDate, AddedDate, ModifiedDate
+	SELECT TransactionId, UserId, CategoryName, PayeeName, Amount, TransactionDate, AddedDate, ModifiedDate
 	FROM VW_Transactions
 	WHERE (@TransactionId IS NULL OR TransactionId = @TransactionId)
 		AND UserId = @UserId
