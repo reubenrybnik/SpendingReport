@@ -40,3 +40,48 @@ input[type="checkbox"].input-validation-error {
 .validation-summary-valid {
     display: none;
 }
+
+#transactionsTable th, #transactionsTable td
+{
+    padding-left: 10px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+}
+
+#transactionsTable th:first-child, #transactionsTable td:first-child
+{
+    padding-left: 0px;
+}
+
+#transactionsTable .edit
+{
+    display: none;
+}
+
+#transactionsTable tr.editing .view
+{
+    display: none;
+}
+
+#transactionsTable tr.editing .edit
+{
+    display: inherit;
+}
+
+#accountTabContent .userInput
+{
+    width: 200px;
+    margin-left: 10px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+
+#accountTabContent .firstName
+{
+    margin-left: 0px;
+}
+
+#accountTabContent .middleInitial
+{
+    width: 30px;
+}

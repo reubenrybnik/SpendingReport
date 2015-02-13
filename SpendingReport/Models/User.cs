@@ -1,16 +1,16 @@
-﻿using Microsoft.AspNet.Identity;
-using SpendingReport.DataContext;
+﻿using SpendingReport.DataContext;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Security.Principal;
 using System.Web;
 
 namespace SpendingReport.Models
 {
     [DataContract]
-    public sealed class User : DbEntity<User>, IUser
+    public sealed class User : DbEntity<User>
     {
         private static readonly Random passwordSaltGenerator = new Random();
         private static readonly IReadOnlyDictionary<DbOperation, DbOperationInfo> entityDbOperations = new ReadOnlyDictionary<DbOperation, DbOperationInfo>
@@ -50,11 +50,6 @@ namespace SpendingReport.Models
         public override IReadOnlyDictionary<DbOperation, DbOperationInfo> DbOperations
         {
             get { return User.entityDbOperations; }
-        }
-
-        public string Id
-        {
-            get { return UserId.ToString(); }
         }
 
         public long UserId
@@ -102,7 +97,7 @@ namespace SpendingReport.Models
         }
 
         [DataMember]
-        public char MiddleInitial
+        public string MiddleInitial
         {
             get;
             set;

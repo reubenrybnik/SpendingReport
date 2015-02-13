@@ -85,7 +85,7 @@ namespace SpendingReport.Services
 
             return connection.GetSingle<UserCategory>
             (
-                new DbParameter("UserId", user.Id),
+                new DbParameter("UserId", user.UserId),
                 new DbParameter("Name", categoryName)
             );
         }
@@ -98,7 +98,7 @@ namespace SpendingReport.Services
 
                 return connection.Get<UserCategory>
                 (
-                    new DbParameter("UserId", user.Id),
+                    new DbParameter("UserId", user.UserId),
                     new DbParameter("ParentName", parentCategoryName)
                 );
             }
@@ -151,7 +151,7 @@ namespace SpendingReport.Services
 
             return connection.GetSingle<Transaction>
             (
-                new DbParameter("UserId", user.Id),
+                new DbParameter("UserId", user.UserId),
                 new DbParameter("TransactionId", transactionId)
             );
         }
@@ -164,7 +164,7 @@ namespace SpendingReport.Services
 
                 return connection.Get<Transaction>
                 (
-                    new DbParameter("UserId", user.Id),
+                    new DbParameter("UserId", user.UserId),
                     new DbParameter("CategoryName", categoryName),
                     new DbParameter("PayeeName", payeeName),
                     new DbParameter("StartDate", startDate),
