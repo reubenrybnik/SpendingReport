@@ -12,25 +12,37 @@
 </div>
 <div id="transactionsTabContent" class="tab-content hidden">
     <script id="transaction-template" type="text/template">
+        <input id="triggerSelect" type="checkbox" <%= checked ? 'checked="checked"' : '' %> />
         <!-- TODO: provide autocomplete list of previous payees -->
-        <td><label class="view"><%- PayeeName %></label><input class="edit" type="text" value="<%- PayeeName %>" /></td>
+        <td><label class="view"><%- PayeeName %></label><input id="payeeNameInput" class="edit" type="text" value="<%- PayeeName %>" /></td>
         <!-- TODO: validate amount -->
-        <td><label class="view"><%- Amount %></label><input class="edit" type="text" value="<%- Amount %>" /></td>
-        <td><label class="view"><%- TransactionDate %></label><input class="edit" type="datetime" value="<%- TransactionDate %>" /></td>
+        <td><label class="view"><%- Amount %></label><input id="amountInput" class="edit" type="text" value="<%- Amount %>" /></td>
+        <td><label class="view"><%- TransactionDate %></label><input id="transactionDateInput" class="edit" type="datetime" value="<%- TransactionDate %>" /></td>
         <!-- TODO: make this an option list -->
-        <td><label class="view"><%- CategoryName %></label><input class="edit" type="text" value="<%- CategoryName %>" /></td>
+        <td><label class="view"><%- CategoryName %></label><input id="categoryNameInput" class="edit" type="text" value="<%- CategoryName %>" /></td>
+        <td><a id="triggerEdit" class="view" href="#">Edit</a><a id="triggerSave" class="edit" href="#">Save</a></td>
     </script>
     <p id="transactionsLoadingIndicator">Loading...</p>
     <table id="transactionsTable" class="table-striped hidden">
         <thead>
             <tr>
+                <th><input id="selectAllCheckbox" type="checkbox" /></th>
                 <th>Payee</th>
                 <th>Amount</th>
                 <th>Date</th>
                 <th>Category</th>
+                <th></th>
             </tr>
         </thead>
         <tbody id="transactionsTableBody"></tbody>
+        <tfoot>
+            <tr>
+                <td colspan="6">
+                    <button id="addButton">Add Transaction</button>
+                    <button id="deleteButton">Delete Selected</button>
+                </td>
+            </tr>
+        </tfoot>
     </table>
 </div>
 <div id="accountTabContent" class="tab-content hidden">
@@ -62,7 +74,7 @@
 </div>
 <!-- END debug -->
 <!-- TODO: figure out why require.js isn't working and also why it kills debugging -->
-<!-- <script data-main="Scripts/Model" src="~/Scripts/Require.js"></script> -->
+<!-- <script data-main="Scripts/Model.js" src="~/Scripts/Require.js"></script> -->
 <script src="~/Scripts/jquery-1.10.2.js"></script>
 <script src="~/Scripts/underscore.js"></script>
 <script src="~/Scripts/backbone.js"></script>

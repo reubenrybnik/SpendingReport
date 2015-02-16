@@ -23,7 +23,7 @@ namespace SpendingReport.DataContext
         {
             foreach (DbEntityProperty property in DbEntity<TEntity>.properties.Values)
             {
-                if (property.IsDataMember)
+                if (property.IsDataMember && property.HasPublicSet)
                 {
                     property.PropertyInfo.SetValue(this, property.PropertyInfo.GetValue(other));
                 }
@@ -189,7 +189,7 @@ namespace SpendingReport.DataContext
             {
                 this.PropertyInfo = propertyInfo;
                 this.HasPublicSet = (propertyInfo.GetAccessors().Length > 1);
-                this.IsDataMember = propertyInfo.CustomAttributes.OfType<DataMemberAttribute>().Any();
+                this.IsDataMember = (propertyInfo.GetCustomAttribute<DataMemberAttribute>() != null);
             }
         }
     }

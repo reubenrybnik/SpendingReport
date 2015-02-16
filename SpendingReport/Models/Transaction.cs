@@ -48,6 +48,7 @@ namespace SpendingReport.Models
             get { return Transaction.entityDbOperations; }
         }
 
+        [DataMember]
         public Guid TransactionId
         {
             get;

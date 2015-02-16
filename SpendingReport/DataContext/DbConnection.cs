@@ -234,7 +234,24 @@ namespace SpendingReport.DataContext
                     deleteCommand.Parameters.Add(entityParameter);
                     deleteCommand.CommandType = CommandType.StoredProcedure;
 
-                    deleteCommand.ExecuteNonQuery();
+                    bool connectionAlreadyOpen = (this.dbConnection.State == ConnectionState.Open);
+
+                    if (!connectionAlreadyOpen)
+                    {
+                        this.dbConnection.Open();
+                    }
+
+                    try
+                    {
+                        deleteCommand.ExecuteNonQuery();
+                    }
+                    finally
+                    {
+                        if (!connectionAlreadyOpen)
+                        {
+                            this.dbConnection.Close();
+                        }
+                    }
                 }
             }
         }

@@ -13,6 +13,11 @@ namespace SpendingReport.Controllers
     {
         private User GetApplicationUser(IDbConnection connection, string userName)
         {
+            if (userName == null)
+            {
+                throw new ArgumentNullException("userName");
+            }
+
             return connection.GetSingle<User>
             (
                 new DbParameter("UserName", userName)
@@ -21,38 +26,37 @@ namespace SpendingReport.Controllers
 
         private DbParameter GetApplicationUserParameter(IDbConnection connection, string userName)
         {
-            return new DbParameter("UserId", this.GetApplicationUser(connection, userName).UserId);
+            User user = this.GetApplicationUser(connection, userName);
+
+            if (user == null)
+            {
+                throw new HttpResponseException(HttpStatusCode.NotFound);
+            }
+
+            return new DbParameter("UserId", user.UserId);
         }
 
+        [HttpGet]
         [Route("api/user/{userName}/transaction")]
-        public IHttpActionResult Get(string userName)
+        public IHttpActionResult Get(string userName, DateTime? startDate = null, DateTime? endDate = null)
         {
+            if (userName == null)
+            {
+                throw new HttpResponseException(HttpStatusCode.NotFound);
+            }
+
             using (IDbConnection connection = DbConnectionFactory.CreateConnection())
             {
                 Transaction[] transactions = connection.Get<Transaction>
                 (
-                    this.GetApplicationUserParameter(connection, userName)
+                    this.GetApplicationUserParameter(connection, userName),
+                    new DbParameter("StartDate", startDate),
+                    new DbParameter("EndDate", endDate)
                 );
 
-                return this.Json<Transaction[]>(transactions);
+                return this.Json(transactions);
             }
         }
-
-        //[Route("api/user/{userName}/transaction?startDate={startDate:datetime}&endDate={endDate:datetime}")]
-        //public IHttpActionResult Get([FromUri]string userName, [FromUri]DateTime startDate, [FromUri]DateTime endDate)
-        //{
-        //    using (IDbConnection connection = DbConnectionFactory.CreateConnection())
-        //    {
-        //        Transaction[] transactions = connection.Get<Transaction>
-        //        (
-        //            this.GetApplicationUserParameter(connection, userName),
-        //            new DbParameter("StartDate", startDate),
-        //            new DbParameter("EndDate", endDate)
-        //        );
-
-        //        return this.Json<Transaction[]>(transactions);
-        //    }
-        //}
 
         [Route("api/user/{userName}/transaction/{transactionId:guid}")]
         public IHttpActionResult Get(string userName, Guid transactionId)
@@ -60,7 +64,13 @@ namespace SpendingReport.Controllers
             using (IDbConnection connection = DbConnectionFactory.CreateConnection())
             {
                 Transaction transaction = this.GetById(connection, userName, transactionId);
-                return this.Json<Transaction>(transaction);
+
+                if (transaction == null)
+                {
+                    throw new HttpResponseException(HttpStatusCode.NotFound);
+                }
+
+                return this.Json(transaction);
             }
         }
 
@@ -84,7 +94,9 @@ namespace SpendingReport.Controllers
 
                 connection.Put(value);
 
-                return this.Created(new Uri(string.Format("api/users/{0}/transaction/{1}", userName, value.TransactionId)), value);
+                return this.Json(value);
+                // TODO: see if I can find a way to return 201 (Created) with a Json value
+                //return this.Created(string.Format("api/users/{0}/transaction/{1}", userName, value.TransactionId), value);
             }
         }
 
@@ -96,9 +108,14 @@ namespace SpendingReport.Controllers
             {
                 Transaction transaction = this.GetById(connection, userName, transactionId);
 
+                if (transaction == null)
+                {
+                    throw new HttpResponseException(HttpStatusCode.NotFound);
+                }
+
                 transaction.Put(value);
                 connection.Put(transaction);
-                return this.Ok(transaction);
+                return this.Json(transaction);
             }
         }
 
@@ -106,7 +123,19 @@ namespace SpendingReport.Controllers
         [Route("api/user/{userName}/transaction/{transactionId:guid}")]
         public IHttpActionResult Delete(string userName, Guid transactionId)
         {
-            return this.Ok();
+            using (IDbConnection connection = DbConnectionFactory.CreateConnection())
+            {
+                Transaction transaction = this.GetById(connection, userName, transactionId);
+
+                if (transaction == null)
+                {
+                    throw new HttpResponseException(HttpStatusCode.NotFound);
+                }
+
+                connection.Delete(transaction);
+
+                return this.Ok();
+            }
         }
     }
 }

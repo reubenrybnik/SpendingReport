@@ -8,6 +8,10 @@
 //    },
 //    shim:
 //    {
+//        jquery:
+//        {
+//            exports: '$'
+//        },
 //        underscore:
 //        {
 //            exports: '_'
@@ -26,14 +30,15 @@
     var User = Backbone.Model.extend
     ({
         urlRoot: '/api/user',
+
         idAttribute: 'UserName',
 
         initialize: function ()
         {
-            this.userCategories = new UserCategoryCollection,
-            this.userCategories.url = '/api/user/' + this.id + '/userCategory'
-            this.transactions = new TransactionCollection,
-            this.transactions.url = '/api/user/' + this.id + '/transaction'
+            this.userCategories = new UserCategoryCollection;
+            this.userCategories.url = '/api/user/' + this.id + '/userCategory';
+            this.transactions = new TransactionCollection;
+            this.transactions.url = '/api/user/' + this.id + '/transaction';
         }
     });
 
@@ -49,12 +54,34 @@
 
     var Transaction = Backbone.Model.extend
     ({
-        idAttribute: 'TransactionId'
+        idAttribute: 'TransactionId',
+        
+        defaults:
+        {
+            PayeeName: '',
+            Amount: '',
+            TransactionDate: Date.now(),
+            CategoryName: '',
+            checked: false
+        },
+
+        toggle: function(checked)
+        {
+            if (checked)
+            {
+                this.set('checked', true);
+            }
+            else
+            {
+                this.set('checked', false);
+            }
+        }
     });
 
     var TransactionCollection = Backbone.Collection.extend
     ({
         model: Transaction,
+
         comparator: function (item)
         {
             return item.get('TransactionDate');
@@ -64,8 +91,11 @@
     var UserView = Backbone.View.extend
     ({
         model: User,
+
         el: $('#accountTabContent'),
+
         template: _.template($('#user-template').html()),
+
         render: function ()
         {
             return this.$el.html(this.template(this.model.attributes));
@@ -75,25 +105,106 @@
     var TransactionView = Backbone.View.extend
     ({
         tagName: "tr",
+
         template: _.template($('#transaction-template').html()),
+
+        initialize: function()
+        {
+            this.listenTo(this.model, 'change', this.render);
+            this.listenTo(this.model, 'destroy', this.remove);
+        },
+
+        events:
+        {
+            'click #triggerSelect': 'selectTransaction',
+            'click #triggerEdit': 'editTransaction',
+            'click #triggerSave': 'saveTransaction',
+        },
+
+        selectTransaction: function(event)
+        {
+            this.stopListening(this.model, 'change');
+            this.model.set('checked', event.target.checked);
+            this.listenTo(this.model, 'change', this.render);
+        },
+
+        editTransaction: function()
+        {
+            this.$el.addClass('editing');
+        },
+
+        saveTransaction: function()
+        {
+            var payeeNameInput = $('#payeeNameInput', this.$el);
+            var amountInput = $('#amountInput', this.$el);
+            var transactionDateInput = $('#transactionDateInput', this.$el);
+            var categoryNameInput = $('#categoryNameInput', this.$el);
+            this.model.save
+            ({
+                PayeeName: payeeNameInput.val(),
+                Amount: amountInput.val(),
+                TransactionDate: transactionDateInput.val(),
+                CategoryName: categoryNameInput.val()
+            });
+
+            this.$el.removeClass('editing');
+        },
+
         render: function ()
         {
-            return this.$el.html(this.template(this.model.attributes));
+            this.$el.html(this.template(this.model.attributes));
+            return this;
         }
     });
 
     var TransactionCollectionView = Backbone.View.extend
     ({
-        el: $('#transactionsTableBody'),
+        el: $('#transactionsTable'),
+
+        initialize: function()
+        {
+            this.tableBody = $('#transactionsTableBody', this.$el);
+        },
+
+        events:
+        {
+            'click #selectAllCheckbox': 'selectAll',
+            'click #addButton': 'addSingle',
+            'click #deleteButton': 'deleteSelected'
+        },
+        
+        selectAll: function(checkbox)
+        {
+            _.each(this.model, function (item)
+            {
+                item.toggle(checkbox.checked);
+            });
+        },
+
+        addSingle: function()
+        {
+            var newTransaction = new Transaction;
+            this.model.add(newTransaction);
+            var transactionView = this.renderSingle(newTransaction);
+            transactionView.$el.addClass('editing');
+        },
+
+        deleteSelected: function()
+        {
+            _.invoke(this.model.where({ checked: true }), 'destroy');
+        },
+
         render: function ()
         {
             var self = this;
+            _.each(this.model.models, this.renderSingle, self);
+        },
 
-            _.each(this.model.models, function (transaction)
-            {
-                var transactionView = new TransactionView({ model: transaction });
-                self.$el.append(transactionView.render());
-            });
+        renderSingle: function(transaction)
+        {
+            var transactionView = new TransactionView({ model: transaction });
+            this.tableBody.append(transactionView.render().el);
+            return transactionView;
         }
     });
 
@@ -103,10 +214,10 @@
 
         events:
         {
-            "click #spendingTab": "viewSpending",
-            "click #categoriesTab": "viewCategories",
-            "click #transactionsTab": "viewTransactions",
-            "click #accountTab": "viewAccount"
+            'click #spendingTab': 'viewSpending',
+            'click #categoriesTab': 'viewCategories',
+            'click #transactionsTab': 'viewTransactions',
+            'click #accountTab': 'viewAccount'
         },
 
         viewSpending: function ()
@@ -183,4 +294,8 @@
             $('#lastFetchStatus').html(textStatus);
         });
     }
+//},
+//function (err)
+//{
+//    $('#lastFetchError').html(err);
 //});

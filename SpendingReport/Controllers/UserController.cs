@@ -33,17 +33,17 @@ namespace SpendingReport.Controllers
             }
         }
 
-        //[Route("api/users?emailAddress={emailAddress}")]
-        //public User GetByEmail(string emailAddress)
-        //{
-        //    using(IDbConnection connection = DbConnectionFactory.CreateConnection())
-        //    {
-        //        return connection.GetSingle<User>
-        //        (
-        //            new DbParameter("EmailAddress", emailAddress)
-        //        );
-        //    }
-        //}
+        [Route("api/user")]
+        public User GetByEmail(string emailAddress = null)
+        {
+            using (IDbConnection connection = DbConnectionFactory.CreateConnection())
+            {
+                return connection.GetSingle<User>
+                (
+                    new DbParameter("EmailAddress", emailAddress)
+                );
+            }
+        }
 
         [HttpPut]
         [Route("api/user/{userName}")]
